@@ -1,0 +1,26 @@
+{
+  "name": "d4pp_project",
+  "version": "1.0.0",
+  "description": "D4pp decenetralized governance",
+  "main": "index.js",
+  "scripts": {
+    "test": "truffle test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Abdillahzakkie/d4pp_project.git"
+  },
+  "keywords": [
+    "ethereum",
+    "DeFi",
+    "Smart-Contract",
+    "dApp",
+    "trufflesuite"
+  ],
+  "author": "Abdullah Zakariyya zakariyyaopeyemi@gmail.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Abdillahzakkie/d4pp_project/issues"
+  },
+  "homepage": "https://github.com/Abdillahzakkie/d4pp_project#readme"
+}
