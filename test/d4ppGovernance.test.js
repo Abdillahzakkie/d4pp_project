@@ -126,8 +126,7 @@ contract("D4pp Governance", async ([deployer, user1, user2, user3]) => {
         let receipt;
 
         beforeEach(async () => {
-            const _newDuration = (parseInt(new Date().getTime().toString()) + 86400).toString();
-            await this.contract.registerProject(startTime, _newDuration, softCap, hardCap, { from: user1 });
+            await this.contract.registerProject(startTime, duration, softCap, hardCap, { from: user1 });
             
             // approve 100 tokens to D4ppGovernance
             await this.token.approve(this.contract.address, toWei(100), { from: user2 });
