@@ -4,7 +4,11 @@
   "description": "D4pp decenetralized governance",
   "main": "index.js",
   "scripts": {
-    "test": "truffle test"
+    "ganache": "ganache-cli --deterministic",
+    "test": "truffle test",
+    "test:governance": "truffle test test/d4ppGovernance.test.js",
+    "compile": "truffle compile --all",
+    "migrate:dev": "truffle migrate --reset --network development"
   },
   "repository": {
     "type": "git",
@@ -22,5 +26,14 @@
   "bugs": {
     "url": "https://github.com/Abdillahzakkie/d4pp_project/issues"
   },
-  "homepage": "https://github.com/Abdillahzakkie/d4pp_project#readme"
+  "homepage": "https://github.com/Abdillahzakkie/d4pp_project#readme",
+  "dependencies": {
+    "@openzeppelin/contracts": "^3.3.0-solc-0.7",
+    "truffle": "^5.1.58"
+  },
+  "devDependencies": {
+    "@openzeppelin/test-helpers": "^0.5.10",
+    "chai": "^4.2.0",
+    "ganache-cli": "^6.12.1"
+  }
 }
