@@ -73,7 +73,7 @@ contract("D4pp Governance", async ([deployer, user1, user2, user3]) => {
             assert(false);
         })
 
-        it("shouldreject if duration is less than or equal to Zero", async () => {
+        it("should reject if duration is less than or equal to Zero", async () => {
             try {
                 await this.contract.registerProject(startTime, '0', softCap, hardCap, { from: user2 });
             } catch (error) {
