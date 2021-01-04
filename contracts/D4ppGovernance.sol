@@ -1,83 +1,171 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.7.5;
+pragma solidity 0.7.6;
+pragma abicoder v2;
 
-import "@openzeppelin/contracts/GSN/Context.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./D4ppCore.sol";
 
+contract D4ppGovernance is D4ppCore {
+    using SafeMath for uint;
 
-contract D4ppGovernance is Ownable, ReentrancyGuard {
-    using SafeMath for uint256;
-
-    // The token being used
-    address public token;
-    uint public totalProjectCount;
-    
-    event ProjectCreated(address indexed creator, uint indexed projectId);
-    event GrantedFunds(address indexed user, address indexed beneficiary, uint indexed amount);
-
-    mapping(uint => Project) public projects;
-
-    struct Project {
-        address creator;
+    /// @notice Records Proposal
+    struct Proposal {
+        // Propose subject
+        bytes32 description;
+        // Creator of the proposal
+        address proposer;
+        // Id of the project the call is to be made
         uint projectId;
+        // The block at which voting begins
         uint startTime;
-        uint duration;
-        uint softCap;
-        uint hardCap;
-        uint currentRaised;
+        // The block at which voting ends: votes must be cast prior to this block
+        uint endTime;
+        // Current number of votes in favor of this proposal
+        uint forVotes;
+        // Current number of votes in opposition to this proposal
+        uint againstVotes;
+        // Total number of votes that has been registered;
+        uint totalVotes;
+        // Flag marking whether the proposal has been executed
+        bool executed;
+        // Flag marking whether the proposal voting time has been extended
+        // Voting time can be extended once, if the proposal outcome has changed during CLOSING_PERIOD
+        bool extended;
     }
 
-    constructor(address _token) {
-        require(_token != address(0), "D4ppGovernance: token is the zero address");
-        token = _token;
-        totalProjectCount = 0;
-    }
-
-    function registerProject(uint _startTime, uint _duration, uint _softCap, uint _hardCap) public {
-        require(_startTime >= block.timestamp, "D4ppGovernance: startTIme should be greater than or equal to current block");
-        require(_duration > 0, "D4ppGovernance: duration must be greater than zero");
-        require(_softCap > 0 && _hardCap > 0, "D4ppGovernance: SofCap and HardCap must be greater than zero");
-        require(_softCap != _hardCap, "D4ppGovernance: SoftCap must not equal HardCap");
-
-        totalProjectCount = totalProjectCount.add(1);
-        projects[totalProjectCount] = Project(
-            _msgSender(),
-            totalProjectCount,
-            _startTime,
-            _duration,
-            _softCap,
-            _hardCap,
-            0
-        );
-        emit ProjectCreated(_msgSender(), totalProjectCount);
+    /// @notice Ballot receipt record for a voter
+    struct Receipt {
+        // Project Id of the proposed vote
+        uint projectId;
+        // Whether or not a vote has been cast
+        bool hasVoted;
     }
 
 
-    function grantFunds(address _token, uint _projectId, uint _amount) public {
-        Project memory _project = projects[_projectId];
-        require(_project.creator != address(0), "D4ppGovernance: ProjectId doesn't exist");
+    /// @notice The official record of all proposals ever proposed
+    mapping(uint => Proposal) public proposals;
+
+    /// @notice Receipts of ballots for the entire set of voters
+    mapping(address => Receipt) public receipts;
+
+    /// @notice An event emitted when a new proposal is created
+    event ProposalCreated(
+        bytes32 description,
+        address indexed proposer,
+        uint indexed projectId,
+        uint startTime,
+        uint endTime
+    );
+
+    /// @notice An event emitted when a vote has been cast on a proposal
+    event Voted(uint indexed proposalId, address indexed voter, bool indexed support, uint votes);
+
+    /// @notice An event emitted when a proposal has been executed
+    event ProposalExecuted(uint indexed proposalId);
+
+    /// @notice Only valid owner is allowed to call the fucntion
+    modifier onlyValidCreator(uint _projectId) {
         require(
-            _project.startTime.add(_project.duration) > block.timestamp, 
-            "D4ppGovernance: Project duration has been exceeded"
+            _msgSender() == projects[_projectId].creator,
+            "D4ppGovernance: Only valid owner is allowed to create proposal"
         );
-        require(
-            _project.currentRaised.add(_amount) <= _project.hardCap,
-            "Project has been fully funded"
-        );
-        IERC20(_token).transferFrom(_msgSender(), address(this), _amount);
-        projects[_projectId].currentRaised = _project.currentRaised.add(_amount);
-        emit GrantedFunds(_msgSender(), _project.creator, _amount);
+        _;
     }
 
-    function withdarAnyERC20Tokens(address _tokenAddress) public onlyOwner {
-        uint _balance = IERC20(_tokenAddress).balanceOf(address(this));
-        IERC20(_tokenAddress).transfer(_msgSender(), _balance);
+    /// @notice Only vote while current time < endtime
+    modifier onlyWhileActive(uint _projectId) {
+        require(
+            grants[_projectId][_msgSender()] > 0,
+            "D4ppGovernance: Invalid vote"
+        );
+        require(
+            proposals[_projectId].endTime > block.timestamp,
+            "D4ppGovernance: Proposal does not exist"
+        );
+        _;
+    }
+
+    constructor(address _token) D4ppCore(_token) {
+        _initialize();
     }
 
     receive() external payable {
         revert("D4ppGovernance: Ether deposits is not allowed!");
     }
+
+    function _initialize() internal {
+        address _proposer = address(0);
+        uint _projectId = 0;
+        uint _startTime = block.timestamp;
+        uint _endTime = block.timestamp;
+        bytes32 _description = bytes32("Initial proposal");
+        // Create a dummy proposal so that indexes start from 1
+        proposals[_projectId] = Proposal(
+            _description,
+            _proposer,
+            _projectId,
+            _startTime,
+            _endTime,
+            0,
+            0,
+            1,
+            false,
+            false
+        );
+
+        receipts[_proposer] = Receipt(_projectId, true);
+        emit ProposalExecuted(_projectId);
+        emit ProposalCreated(
+            _description, 
+            _proposer,
+            _projectId,
+            _startTime,
+            _endTime
+        );
+    }
+
+    function createProposal(uint _projectId, bytes32 _proposeDescription, uint _startTime, uint _endTime) public {
+        require(
+            _startTime > block.timestamp && 
+            _endTime > block.timestamp,
+            "D4ppGovernance: startTime & endTime must be greater than block.timestamp"
+        );
+        require(
+            _endTime > _startTime,
+            "D4ppGovernance: endTIme must be greater than startTime"
+        );
+        require(
+            _proposeDescription != bytes32(""), 
+            "Governance: Invalid proposal descriptoion"
+        );
+        _propose(_proposeDescription, _projectId, _startTime, _endTime);
+    }
+
+    function _propose(bytes32 _description, uint _projectId, uint _startTime, uint _endTime) internal {
+        address _proposer = _msgSender();
+        proposals[_projectId] = Proposal(
+            _description,
+            _proposer,
+            _projectId,
+            _startTime,
+            _endTime,
+            0,
+            0,
+            0,
+            false,
+            false
+        );
+        emit ProposalCreated(
+            _description, 
+            _proposer,
+            _projectId,
+            _startTime,
+            _endTime
+        );
+    }
+
+    function vote(uint _projectId) public onlyWhileActive(_projectId) returns(Receipt memory) {
+        
+    }
+
 }

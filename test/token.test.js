@@ -29,7 +29,8 @@ contract("D4pp Token", async ([deployer, user1, user2, user3]) => {
 
         it("set deployer's token balance to the total supply", async () => {
             const totalSupply = await this.token.totalSupply();
-            expect(await this.token.balanceOf(deployer)).to.equal(totalSupply.toString());
+            const balance = await this.token.balanceOf(deployer);
+            expect(balance.toString()).to.equal(totalSupply.toString());
         })
     })
 })

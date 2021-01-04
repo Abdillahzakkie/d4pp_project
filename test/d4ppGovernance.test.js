@@ -3,25 +3,25 @@ const { expectEvent } = require('@openzeppelin/test-helpers');
 const { ZERO_ADDRESS } = require("@openzeppelin/test-helpers/src/constants");
 
 const D4ppToken = artifacts.require("D4ppToken");
-const D4ppGovernance = artifacts.require("D4ppGovernance");
+const D4ppCore = artifacts.require("D4ppCore");
 
 const toWei = _amount => web3.utils.toWei(_amount.toString(), "ether");
 const fromWei = _amount => web3.utils.fromWei(_amount.toString(), "ether");
 
 const projects = [
     {
-        startTime: new Date().getTime().toString(), 
-        duration: '86400', // 1 day duration
+        startTime: (Number(new Date().getTime().toString()) + 90).toString(), 
+        endTime: (Number(new Date().getTime().toString()) + 3600).toString(),
         softCap: toWei(30), 
         hardCap: toWei(1000)
     }
 ];
 
 
-contract("D4pp Governance", async ([deployer, user1, user2, user3]) => {
+contract("D4ppCore", async ([deployer, user1, user2, user3]) => {
     beforeEach(async () => {
         this.token = await D4ppToken.new("D4pp Token", "d4pp", { from: deployer });
-        this.contract = await D4ppGovernance.new(this.token.address, { from: deployer });
+        this.contract = await D4ppCore.new(this.token.address, { from: deployer });
 
         // Transfer 1000 tokens to user1 and user2
         await this.token.transfer(user1, toWei(1000), { from: deployer });
@@ -37,11 +37,12 @@ contract("D4pp Governance", async ([deployer, user1, user2, user3]) => {
     })
 
     describe("should register new project", async () => {
-        const { startTime, duration, softCap, hardCap } = projects[0];
+        const { startTime, endTime, softCap, hardCap } = projects[0];
+        
         let receipt;
 
         beforeEach(async () => {
-            receipt = await this.contract.registerProject(startTime, duration, softCap, hardCap, { from: user1 });
+            receipt = await this.contract.registerProject(startTime, endTime, softCap, hardCap, { from: user1 });
         })
 
         it("should create new project", async () => {
@@ -50,7 +51,7 @@ contract("D4pp Governance", async ([deployer, user1, user2, user3]) => {
                 creator,
                 projectId,
                 startTime: _startTime, 
-                duration: _duration, 
+                endTime: _endTime, 
                 softCap: _softCap, 
                 hardCap: _hardCap,
             } = project;
@@ -58,26 +59,36 @@ contract("D4pp Governance", async ([deployer, user1, user2, user3]) => {
             expect(creator).to.equal(user1);
             expect(projectId.toString()).to.equal("1");
             expect(_startTime.toString()).to.equal(startTime);
-            expect(_duration.toString()).to.equal(duration);
+            expect(_endTime.toString()).to.equal(endTime);
             expect(_softCap.toString()).to.equal(softCap);
             expect(_hardCap.toString()).to.equal(hardCap);
         })
 
-        it("should reject if startTime is less than current time", async () => {
+        it("should reject if startTime is less than block.timestamp", async () => {
             try {
-                await this.contract.registerProject('20', duration, softCap, hardCap, { from: user2 });
+                await this.contract.registerProject('20', endTime, softCap, hardCap, { from: user2 });
             } catch (error) {
-                assert(error.message.includes("D4ppGovernance: startTIme should be greater than or equal to current block"));
+                assert(error.message.includes("D4ppCore: startTime and endTime should be greater than or equal to current block"));
                 return;
             }
             assert(false);
         })
 
-        it("should reject if duration is less than or equal to Zero", async () => {
+        it("should reject if startTime is equal to endTime", async () => {
+            try {
+                await this.contract.registerProject(startTime, startTime, softCap, hardCap, { from: user2 });
+            } catch (error) {
+                assert(error.message.includes("D4ppCore: endTime must be greater than startTime"));
+                return;
+            }
+            assert(false);
+        })
+
+        it("should reject if endTime is less than or equal to Zero", async () => {
             try {
                 await this.contract.registerProject(startTime, '0', softCap, hardCap, { from: user2 });
             } catch (error) {
-                assert(error.message.includes("D4ppGovernance: duration must be greater than zero"));
+                assert(error.message.includes("D4ppCore: startTime and endTime should be greater than or equal to current block"));
                 return;
             }
             assert(false);
@@ -85,9 +96,9 @@ contract("D4pp Governance", async ([deployer, user1, user2, user3]) => {
 
         it("should reject if SoftCap is less than or equal to Zero", async () => {
             try {
-                await this.contract.registerProject(startTime, duration, 0, hardCap, { from: user2 });
+                await this.contract.registerProject(startTime, endTime, 0, hardCap, { from: user2 });
             } catch (error) {
-                assert(error.message.includes("D4ppGovernance: SofCap and HardCap must be greater than zero"));
+                assert(error.message.includes("D4ppCore: SofCap and HardCap must be greater than zero"));
                 return;
             }
             assert(false);
@@ -95,9 +106,9 @@ contract("D4pp Governance", async ([deployer, user1, user2, user3]) => {
 
         it("should reject if HardCap is less than or equal to Zero", async () => {
             try {
-                await this.contract.registerProject(startTime, duration, softCap, 0, { from: user2 });
+                await this.contract.registerProject(startTime, endTime, softCap, 0, { from: user2 });
             } catch (error) {
-                assert(error.message.includes("D4ppGovernance: SofCap and HardCap must be greater than zero"));
+                assert(error.message.includes("D4ppCore: SofCap and HardCap must be greater than zero"));
                 return;
             }
             assert(false);
@@ -105,9 +116,9 @@ contract("D4pp Governance", async ([deployer, user1, user2, user3]) => {
 
         it("should reject if SoftCap equals HardCap", async () => {
             try {
-                await this.contract.registerProject(startTime, duration, "20", "20", { from: user2 });
+                await this.contract.registerProject(startTime, endTime, "20", "20", { from: user2 });
             } catch (error) {
-                assert(error.message.includes("D4ppGovernance: SoftCap must not equal HardCap"));
+                assert(error.message.includes("D4ppCore: SoftCap must not equal HardCap"));
                 return;
             }
             assert(false);
@@ -122,32 +133,30 @@ contract("D4pp Governance", async ([deployer, user1, user2, user3]) => {
     })
 
     describe("should fundProject project", () => {
-        const { startTime, duration, softCap, hardCap } = projects[0];
+        const { startTime, endTime, softCap, hardCap } = projects[0];
         let receipt;
 
         beforeEach(async () => {
-            await this.contract.registerProject(startTime, duration, softCap, hardCap, { from: user1 });
+            await this.contract.registerProject(startTime, endTime, softCap, hardCap, { from: user1 });
             
-            // approve 100 tokens to D4ppGovernance
+            // approve 100 tokens to D4ppCore
             await this.token.approve(this.contract.address, toWei(100), { from: user2 });
-            receipt = await this.contract.grantFunds(this.token.address, "1", toWei(100), { from: user2 });
+            receipt = await this.contract.grantFunds("1", toWei(100), { from: user2 });
         })
 
         it("should grant funds to registered projects", async () => {
             const { currentRaised } = await this.contract.projects("1");
+            const amount = await this.contract.grants("1", user2);
             expect(currentRaised.toString()).to.equal(toWei(100));
+            expect(amount.toString()).to.equal(toWei(100));
         })
 
         it("should emit GrantedFunds event", async () => {
-            try {
-                expectEvent(receipt, "GrantedFunds", {
-                    user: user2,
-                    beneficiary: user1,
-                    amount: toWei(100)
-                })
-            } catch (error) {
-                console.log(error)
-            }
+            expectEvent(receipt, "GrantedFunds", {
+                user: user2,
+                beneficiary: user1,
+                amount: toWei(100)
+            })
         })
     })
     
