@@ -6,7 +6,7 @@
   "scripts": {
     "ganache": "ganache-cli --deterministic",
     "test": "truffle test",
-    "test:d4ppCore": "truffle test test/d4ppGovernance.test.js",
+    "test:d4ppGovernance": "truffle test test/d4ppGovernance.test.js",
     "compile": "truffle compile --all",
     "migrate:dev": "truffle migrate --reset --network development"
   },

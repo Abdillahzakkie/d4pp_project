@@ -67,7 +67,7 @@ contract D4ppGovernance is D4ppCore {
     modifier onlyValidCreator(uint _projectId) {
         require(
             _msgSender() == projects[_projectId].creator,
-            "D4ppGovernance: Only valid owner is allowed to create proposal"
+            "D4ppGovernance: Accessed restricted to only vallid creator"
         );
         _;
     }
@@ -85,7 +85,11 @@ contract D4ppGovernance is D4ppCore {
         _;
     }
 
-    constructor(address _token) D4ppCore(_token) {
+    /// @param _token: Address of D4PP token
+    constructor(address _token) {
+        projectCount = 0;
+        require(_token != address(0), "D4ppGovernance: token is the zero address");
+        token = _token;
         _initialize();
     }
 
@@ -124,7 +128,7 @@ contract D4ppGovernance is D4ppCore {
         );
     }
 
-    function createProposal(uint _projectId, bytes32 _proposeDescription, uint _startTime, uint _endTime) public {
+    function createProposal(uint _projectId, bytes32 _proposeDescription, uint _startTime, uint _endTime, bool _extended) public onlyValidCreator(_projectId) {
         require(
             _startTime > block.timestamp && 
             _endTime > block.timestamp,
@@ -132,16 +136,16 @@ contract D4ppGovernance is D4ppCore {
         );
         require(
             _endTime > _startTime,
-            "D4ppGovernance: endTIme must be greater than startTime"
+            "D4ppGovernance: endTime must be greater than startTime"
         );
         require(
             _proposeDescription != bytes32(""), 
-            "Governance: Invalid proposal descriptoion"
+            "D4ppGovernance: Invalid proposal descriptoion"
         );
-        _propose(_proposeDescription, _projectId, _startTime, _endTime);
+        _propose(_proposeDescription, _projectId, _startTime, _endTime, _extended);
     }
 
-    function _propose(bytes32 _description, uint _projectId, uint _startTime, uint _endTime) internal {
+    function _propose(bytes32 _description, uint _projectId, uint _startTime, uint _endTime, bool _extended) internal {
         address _proposer = _msgSender();
         proposals[_projectId] = Proposal(
             _description,
@@ -153,7 +157,7 @@ contract D4ppGovernance is D4ppCore {
             0,
             0,
             false,
-            false
+            _extended
         );
         emit ProposalCreated(
             _description, 

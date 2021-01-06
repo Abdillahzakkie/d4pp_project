@@ -50,13 +50,6 @@ contract D4ppCore is Ownable, ReentrancyGuard {
     /// @notice Keeps tracks of the paid rewards
     mapping(address => bool) public rewardsPaid;
 
-    /// @param _token: Address of D4PP token
-    constructor(address _token) {
-        projectCount = 0;
-        require(_token != address(0), "D4ppGovernance: token is the zero address");
-        token = _token;
-    }
-
     /// @dev Register new project
     /// @param _startTime: Timestamp of when the crowdfund will start
     /// @param _endTime: End time of when the crowdfund will end
