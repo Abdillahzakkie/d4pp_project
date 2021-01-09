@@ -188,14 +188,14 @@ contract D4ppGovernance is D4ppCore {
         );
         require(
             unlockFunds[_projectId] > 0,
-            ""
+            "D4ppGovernance: No crowdfund tokens is available. Proceed to creating new proposal"
         );
         uint _amount = unlockFunds[_projectId];
         uint _taxFees = _amount.mul(10).div(100);
         uint _finalAmount = _amount.sub(_taxFees);
 
-        projects[_projectId].currentRaised = projects[_projectId].currentRaised.sub(_amount);
         unlockFunds[_projectId] = 0;
+        projects[_projectId].currentRaised = projects[_projectId].currentRaised.sub(_amount);
         IERC20(token).transfer(_msgSender(), _finalAmount);
         IERC20(token).transfer(devAddress, _taxFees);
     }

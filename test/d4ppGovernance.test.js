@@ -290,5 +290,19 @@ contract("D4ppGovernance", async ([deployer, devAddress, user1, user2, user3, us
             }
             assert(false);
         })
+
+        it("should reject if there is no tokens available in crowdund", async () => {
+            try {
+                await this.contract.execute("1", { from: user1 });
+                await this.contract.withdrawCrowdsaleTokens("1", { from: user1 });
+                await this.contract.withdrawCrowdsaleTokens("1", { from: user1 });
+            } catch (error) {
+                assert(error.message.includes("D4ppGovernance: No crowdfund tokens is available. Proceed to creating new proposal"));
+                return;
+            }
+            assert(false);
+        })
+
+        // it("should ov   ")
     })
 })
