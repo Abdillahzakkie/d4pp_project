@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 
 contract D4ppGovernance is D4ppCore {
     using SafeMath for uint;
+    address public devAddress;
 
     /// @notice Records Proposal
     struct Proposal {
@@ -94,10 +95,12 @@ contract D4ppGovernance is D4ppCore {
     }
 
     /// @param _token: Address of D4PP token
-    constructor(address _token) {
-        projectCount = 0;
+    constructor(address _token, address _devAddress) {
         require(_token != address(0), "D4ppGovernance: token is the zero address");
+        require(_devAddress != address(0), "D4ppGovernance: _devAddress is the zero address");
+        projectCount = 0;
         token = _token;
+        devAddress = _devAddress;
     }
 
     receive() external payable {
@@ -120,7 +123,7 @@ contract D4ppGovernance is D4ppCore {
         );
         require(
             _withdrawalAmount <= projects[_projectId].currentRaised,
-            "D4ppCore: _withdrawalAmount can not exceed currentRaised"
+            "D4ppCore: _withdrawalAmount exceed currentRaised"
         );
         _propose(_proposeDescription, _projectId, _startTime, _endTime, _withdrawalAmount);
     }
@@ -180,7 +183,7 @@ contract D4ppGovernance is D4ppCore {
     
     function withdrawCrowdsaleTokens(uint _projectId) public onlyValidCreator(_projectId) {
         require(
-            !proposals[_projectId].executed,
+            proposals[_projectId].executed,
             "D4ppGovernance: Proposal has not been executed yet"
         );
         require(
@@ -188,9 +191,24 @@ contract D4ppGovernance is D4ppCore {
             ""
         );
         uint _amount = unlockFunds[_projectId];
+        uint _taxFees = _amount.mul(10).div(100);
+        uint _finalAmount = _amount.sub(_taxFees);
 
         projects[_projectId].currentRaised = projects[_projectId].currentRaised.sub(_amount);
         unlockFunds[_projectId] = 0;
-        IERC20(token).transfer(_msgSender(), _amount);
+        IERC20(token).transfer(_msgSender(), _finalAmount);
+        IERC20(token).transfer(devAddress, _taxFees);
+    }
+
+    function changeDevAddress(address _newDevAddress) external {
+        require(
+            _msgSender() == devAddress,
+            "D4ppGovernance: Access denied"
+        );
+        require(
+            _newDevAddress != address(0),
+            "D4ppGovernance: _newDevAddress can not be zero address"
+        );
+        devAddress = _newDevAddress;
     }
 }
