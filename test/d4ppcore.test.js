@@ -276,25 +276,43 @@ contract("D4PPCORE", async ([deployer, user1, user2, user3]) => {
             // user3 grant some tokens to project 1
             await this.token.approve(this.contract.address, toWei(5), { from: user3 });
             await this.contract.grantFunds("1", toWei(5), { from: user3 });
-
-            // withdraw rewards
-            await this.contract.withdrawRewards("1", { from: user2 });
-            await this.contract.withdrawRewards("1", { from: user3 });
         })
 
         it("should withdraw rewards from project", async () => {
+            await this.contract.withdrawRewards("1", { from: user2 });
             const isPaid = await this.contract.rewardsPaid("1", user2);
             expect(isPaid).to.equal(true);
-
         })
 
         it("should increase user's balance and decrese contract balance", async () => {
+            await this.contract.withdrawRewards("1", { from: user2 });
             const balance = await this.myToken.balanceOf(this.contract.address);
             const userBalance = await this.myToken.balanceOf(user3);
 
             // console.log(balance.toString())
             // expect(balance.toString()).to.equal(toWei(30));
             // expect(userBalance.toString()).to.equal(toWei(70));
+        })
+
+        it("should reject if rewards has already been paid to msg.sender", async () => {
+            try {
+                await this.contract.withdrawRewards("1", { from: user2 });
+                await this.contract.withdrawRewards("1", { from: user2 });
+            } catch (error) {
+                assert(error.message.includes("D4ppCore: Rewards has already been paid to msg.sender"));
+                return;
+            }
+            assert(false);
+        })
+
+        it("should reject if msg.sender has not granted any funds to the project", async () => {
+            try {
+                await this.contract.withdrawRewards("10", { from: user2 }); 
+            } catch (error) {
+                assert(error.message.includes("D4ppCore: Not eligible to rewards from this project"));
+                return;
+            }
+            assert(false);
         })
     })
 
@@ -314,14 +332,36 @@ contract("D4PPCORE", async ([deployer, user1, user2, user3]) => {
         })
 
         it("should withdraw grants", async () => {
+            const _grant = await this.contract.grants("1", user2);
             const _balanceBefore = await this.token.balanceOf(user2);
-            console.log(_balanceBefore.toString());
             await this.contract.withdrawGrants("1", { from: user2 });
             const _balanceAfter = await this.token.balanceOf(user2);
 
             expect(_balanceAfter.toString()).to.equal(
-
+                (Number(_grant) + Number(_balanceBefore.toString())).toString()
             );
+            expect(
+                await (await this.contract.grants("1", user2)).toString()
+            ).to.equal("0")
+        })
+
+        it("should not withdraw if grants is less than zero", async () => {
+            try {
+                await this.contract.withdrawGrants("10", { from: user2 });
+            } catch (error) {
+                assert(error.message.includes("D4ppCore: Not eligible to rewards from this project"));
+                return;
+            }
+            assert(false);
+        })
+
+        it("should emit GrantsWithdrawed event", async () => {
+            const reciept = await this.contract.withdrawGrants("1", { from: user2 });
+            expectEvent(reciept, "GrantsWithdrawed", {
+                user: user2,
+                projectId: "1",
+                amount: toWei(10)
+            })
         })
     })
     

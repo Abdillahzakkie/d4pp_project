@@ -24,11 +24,10 @@ contract D4ppGovernance is D4ppCore {
         uint againstVotes;
         // Total number of votes that has been registered;
         uint totalVotes;
+        // Amount to be withdrawn 
+        uint withdrawalAmount;
         // Flag marking whether the proposal has been executed
         bool executed;
-        // Flag marking whether the proposal voting time has been extended
-        // Voting time can be extended once, if the proposal outcome has changed during CLOSING_PERIOD
-        bool extended;
     }
 
     /// @notice Ballot receipt record for a voter
@@ -99,45 +98,13 @@ contract D4ppGovernance is D4ppCore {
         projectCount = 0;
         require(_token != address(0), "D4ppGovernance: token is the zero address");
         token = _token;
-        _initialize();
     }
 
     receive() external payable {
         revert("D4ppGovernance: Ether deposits is not allowed!");
     }
 
-    function _initialize() internal {
-        address _proposer = address(0);
-        uint _projectId = 0;
-        uint _startTime = block.timestamp;
-        uint _endTime = block.timestamp;
-        bytes32 _description = bytes32("Initial proposal");
-        // Create a dummy proposal so that indexes start from 1
-        proposals[_projectId] = Proposal(
-            _description,
-            _proposer,
-            _projectId,
-            _startTime,
-            _endTime,
-            0,
-            0,
-            1,
-            false,
-            false
-        );
-
-        receipts[_projectId][address(0)] = Receipt(_projectId, true);
-        emit ProposalCreated(
-            _description, 
-            _proposer,
-            _projectId,
-            _startTime,
-            _endTime
-        );
-        emit ProposalExecuted(_projectId);
-    }
-
-    function createProposal(uint _projectId, bytes32 _proposeDescription, uint _startTime, uint _endTime, bool _extended) public onlyValidCreator(_projectId) {
+    function createProposal(uint _projectId, bytes32 _proposeDescription, uint _startTime, uint _endTime, uint _withdrawalAmount) public onlyValidCreator(_projectId) {
         require(
             _startTime > block.timestamp && 
             _endTime > block.timestamp,
@@ -151,11 +118,16 @@ contract D4ppGovernance is D4ppCore {
             _proposeDescription != bytes32(""), 
             "D4ppGovernance: Invalid proposal descriptoion"
         );
-        _propose(_proposeDescription, _projectId, _startTime, _endTime, _extended);
+        require(
+            _withdrawalAmount <= projects[_projectId].currentRaised,
+            "D4ppCore: _withdrawalAmount can not exceed currentRaised"
+        );
+        _propose(_proposeDescription, _projectId, _startTime, _endTime, _withdrawalAmount);
     }
 
-    function _propose(bytes32 _description, uint _projectId, uint _startTime, uint _endTime, bool _extended) internal {
+    function _propose(bytes32 _description, uint _projectId, uint _startTime, uint _endTime, uint _withdrawalAmount) internal {
         address _proposer = _msgSender();
+
         proposals[_projectId] = Proposal(
             _description,
             _proposer,
@@ -165,8 +137,8 @@ contract D4ppGovernance is D4ppCore {
             0,
             0,
             0,
-            false,
-            _extended
+            _withdrawalAmount,
+            false
         );
         emit ProposalCreated(
             _description, 

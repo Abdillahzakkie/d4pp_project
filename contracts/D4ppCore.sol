@@ -24,7 +24,7 @@ contract D4ppCore is Ownable, ReentrancyGuard {
     event GrantFunds(address indexed user, uint indexed projectId, uint indexed amount);
 
     /// @notice An event emitted when grants has been withdrawed
-    event GrantsWithdrawed(address indexed user, uint timestamp, uint amount);
+    event GrantsWithdrawed(address indexed user, uint projectId, uint amount);
 
     struct Project{
         address creator;
@@ -116,16 +116,22 @@ contract D4ppCore is Ownable, ReentrancyGuard {
 
     function withdrawRewards(uint _projectId) external {
         require(
+            !rewardsPaid[_projectId][_msgSender()],
+            "D4ppCore: Rewards has already been paid to msg.sender"
+        );
+        require(
             grants[_projectId][_msgSender()] > 0,
             "D4ppCore: Not eligible to rewards from this project"
         );
-        require(
-            !rewardsPaid[_projectId][_msgSender()],
-            "D4ppCore: Not eligible to any rewards from this project"
-        );
+
         address _token = rewardsPool[_projectId].token;
         uint _totalRewards = rewardsPool[_projectId].amount;
-        uint _rewards = (grants[_projectId][_msgSender()].div(projects[_projectId].currentRaised)).mul(_totalRewards);
+        uint _grants = grants[_projectId][_msgSender()];
+        uint _currentRaised = projects[_projectId].currentRaised;
+
+
+        uint _rewards = _grants.div(_currentRaised);
+        _rewards = _rewards.mul(_totalRewards);
         
         rewardsPaid[_projectId][_msgSender()] = true;
         rewardsPool[_projectId].amount = rewardsPool[_projectId].amount.sub(_rewards);
@@ -145,7 +151,7 @@ contract D4ppCore is Ownable, ReentrancyGuard {
         grants[_projectId][_msgSender()] = 0;
         projects[_projectId].currentRaised = projects[_projectId].currentRaised.sub(_amount);
         IERC20(token).transfer(_msgSender(), _amount);
-        emit GrantsWithdrawed(_msgSender(), block.timestamp, _amount);
+        emit GrantsWithdrawed(_msgSender(), _projectId, _amount);
     }
 
     function withdarAnyERC20Tokens(address _tokenAddress) external onlyOwner {

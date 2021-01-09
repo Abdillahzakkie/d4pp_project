@@ -7,7 +7,6 @@ const D4ppGovernance = artifacts.require("D4ppGovernance");
 
 const toWei = _amount => web3.utils.toWei(_amount.toString(), "ether");
 const fromWei = _amount => web3.utils.fromWei(_amount.toString(), "ether");
-const wait = async () => await setTimeout(() => true, 3000);
 
 const projects = [
     {
@@ -24,7 +23,7 @@ contract("D4ppGovernance", async ([deployer, user1, user2, user3, user4, user5, 
     const _description = web3.utils.toHex("My project proposal");
     const _startTime = (Number(new Date().getTime().toString()) + 90).toString();
     const _endTime = (Number(new Date().getTime().toString()) + 3600).toString();
-    const _extended = false;
+    const _withdrawalAmount = toWei(20);
 
     let receipt;
 
@@ -62,9 +61,9 @@ contract("D4ppGovernance", async ([deployer, user1, user2, user3, user4, user5, 
 
         await this.contract.registerProject(startTime, endTime, toWei(5000), hardCap, { from: user1 });
         await _init();
-        receipt = await this.contract.createProposal("1", _description, _startTime, _endTime, _extended, { from: user1 });
+        receipt = await this.contract.createProposal("1", _description, _startTime, _endTime, _withdrawalAmount, { from: user1 });
     })
-
+    
     describe("createProposal", () => {
         it("should create new proposal", async () => {
             const { 
@@ -77,7 +76,7 @@ contract("D4ppGovernance", async ([deployer, user1, user2, user3, user4, user5, 
                 againstVotes,
                 totalVotes,
                 executed,
-                extended
+                withdrawalAmount 
             } = await this.contract.proposals("1");
 
             expect(web3.utils.hexToUtf8(description)).to.equal(web3.utils.hexToUtf8(_description));
@@ -88,13 +87,13 @@ contract("D4ppGovernance", async ([deployer, user1, user2, user3, user4, user5, 
             expect(forVotes.toString()).to.equal("0");
             expect(againstVotes.toString()).to.equal("0");
             expect(totalVotes.toString()).to.equal("0");
-            expect(extended).to.equal(_extended);
             expect(executed).to.equal(false);
+            expect(withdrawalAmount.toString()).to.equal(_withdrawalAmount);
         })
 
         it("should reject proposal if msg.sender !== creator", async () => {
             try {
-                await this.contract.createProposal("1", _description, _startTime, _endTime, _extended, { from: user2 });
+                await this.contract.createProposal("1", _description, _startTime, _endTime, _withdrawalAmount, { from: user2 });
             } catch (error) {
                 assert(error.message.includes("D4ppGovernance: Accessed restricted to only valid creator"));
                 return;
@@ -105,7 +104,7 @@ contract("D4ppGovernance", async ([deployer, user1, user2, user3, user4, user5, 
         it("should reject if proposal description is empty", async () => {
             try {
                 const _description = web3.utils.toHex("");
-                await this.contract.createProposal("1", _description, _startTime, _endTime, _extended, { from: user1 });
+                await this.contract.createProposal("1", _description, _startTime, _endTime, _withdrawalAmount, { from: user1 });
             } catch (error) {
                 assert(error.message.includes("D4ppGovernance: Invalid proposal descriptoion"));
                 return;
@@ -115,7 +114,7 @@ contract("D4ppGovernance", async ([deployer, user1, user2, user3, user4, user5, 
 
         it("should reject if startTime < block.timestamp", async () => {
             try {
-                await this.contract.createProposal("1", _description, "0", _endTime, _extended, { from: user1 });
+                await this.contract.createProposal("1", _description, "0", _endTime, _withdrawalAmount, { from: user1 });
             } catch (error) {
                 assert(error.message.includes("D4ppGovernance: startTime & endTime must be greater than block.timestamp"));
                 return;
@@ -125,7 +124,7 @@ contract("D4ppGovernance", async ([deployer, user1, user2, user3, user4, user5, 
 
         it("should reject if endTime < block.timestamp", async () => {
             try {
-                await this.contract.createProposal("1", _description, _startTime, "0", _extended, { from: user1 });
+                await this.contract.createProposal("1", _description, _startTime, "0", _withdrawalAmount, { from: user1 });
             } catch (error) {
                 assert(error.message.includes("D4ppGovernance: startTime & endTime must be greater than block.timestamp"));
                 return;
@@ -135,7 +134,7 @@ contract("D4ppGovernance", async ([deployer, user1, user2, user3, user4, user5, 
 
         it("should reject if endTime <= startTime", async () => {
             try {
-                await this.contract.createProposal("1", _description, _startTime, _startTime, _extended, { from: user1 });
+                await this.contract.createProposal("1", _description, _startTime, _startTime, _withdrawalAmount, { from: user1 });
             } catch (error) {
                 assert(error.message.includes("D4ppGovernance: endTime must be greater than startTime"));
                 return;
@@ -253,5 +252,10 @@ contract("D4ppGovernance", async ([deployer, user1, user2, user3, user4, user5, 
             })
         })
     })
+
+    // describe("should overwrite existing proposal after it has been executed", () => {
+        
+    // })
+    
     
 })
