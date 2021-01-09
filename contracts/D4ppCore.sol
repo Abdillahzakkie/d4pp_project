@@ -23,6 +23,9 @@ contract D4ppCore is Ownable, ReentrancyGuard {
     /// @notice An event emitted when a user grants funds to a specific project
     event GrantFunds(address indexed user, uint indexed projectId, uint indexed amount);
 
+    /// @notice An event emitted when grants has been withdrawed
+    event GrantsWithdrawed(address indexed user, uint projectId, uint amount);
+
     struct Project{
         address creator;
         uint projectId;
@@ -48,14 +51,7 @@ contract D4ppCore is Ownable, ReentrancyGuard {
     mapping(uint => Rewards) public rewardsPool;
 
     /// @notice Keeps tracks of the paid rewards
-    mapping(address => bool) public rewardsPaid;
-
-    /// @param _token: Address of D4PP token
-    constructor(address _token) {
-        projectCount = 0;
-        require(_token != address(0), "D4ppGovernance: token is the zero address");
-        token = _token;
-    }
+    mapping(uint => mapping(address => bool)) public rewardsPaid;
 
     /// @dev Register new project
     /// @param _startTime: Timestamp of when the crowdfund will start
@@ -120,20 +116,42 @@ contract D4ppCore is Ownable, ReentrancyGuard {
 
     function withdrawRewards(uint _projectId) external {
         require(
+            !rewardsPaid[_projectId][_msgSender()],
+            "D4ppCore: Rewards has already been paid to msg.sender"
+        );
+        require(
+            grants[_projectId][_msgSender()] > 0,
+            "D4ppCore: Not eligible to rewards from this project"
+        );
+
+        address _token = rewardsPool[_projectId].token;
+        uint _totalRewards = rewardsPool[_projectId].amount;
+        uint _grants = grants[_projectId][_msgSender()];
+        uint _currentRaised = projects[_projectId].currentRaised;
+
+
+        uint _rewards = _grants.div(_currentRaised);
+        _rewards = _rewards.mul(_totalRewards);
+        
+        rewardsPaid[_projectId][_msgSender()] = true;
+        rewardsPool[_projectId].amount = rewardsPool[_projectId].amount.sub(_rewards);
+        IERC20(_token).transfer(_msgSender(), _rewards);
+    }
+
+    function withdrawGrants(uint _projectId) external {
+        require(
             grants[_projectId][_msgSender()] > 0,
             "D4ppCore: Not eligible to rewards from this project"
         );
         require(
-            !rewardsPaid[_msgSender()],
-            "D4ppCore: Not eligible to any rewards from this project"
+            !rewardsPaid[_projectId][_msgSender()],
+            "D4ppCore: Not eligible to any withdrawal from this project"
         );
-        address _token = rewardsPool[_projectId].token;
-        uint _totalRewards = rewardsPool[_projectId].amount;
-        uint _rewards = (grants[_projectId][_msgSender()].div(projects[_projectId].currentRaised)).mul(_totalRewards);
-        
-        rewardsPaid[_msgSender()] = true;
-        rewardsPool[_projectId].amount = rewardsPool[_projectId].amount.sub(_rewards);
-        IERC20(_token).transfer(_msgSender(), _rewards);
+        uint _amount = grants[_projectId][_msgSender()];
+        grants[_projectId][_msgSender()] = 0;
+        projects[_projectId].currentRaised = projects[_projectId].currentRaised.sub(_amount);
+        IERC20(token).transfer(_msgSender(), _amount);
+        emit GrantsWithdrawed(_msgSender(), _projectId, _amount);
     }
 
     function withdarAnyERC20Tokens(address _tokenAddress) external onlyOwner {

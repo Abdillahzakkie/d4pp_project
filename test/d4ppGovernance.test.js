@@ -3,11 +3,10 @@ const { expectEvent } = require('@openzeppelin/test-helpers');
 const { ZERO_ADDRESS } = require("@openzeppelin/test-helpers/src/constants");
 
 const D4ppToken = artifacts.require("D4ppToken");
-const D4ppCore = artifacts.require("D4ppCore");
+const D4ppGovernance = artifacts.require("D4ppGovernance");
 
 const toWei = _amount => web3.utils.toWei(_amount.toString(), "ether");
 const fromWei = _amount => web3.utils.fromWei(_amount.toString(), "ether");
-const wait = async () => await setTimeout(() => true, 3000);
 
 const projects = [
     {
@@ -20,70 +19,104 @@ const projects = [
 
 const { startTime, endTime, softCap, hardCap } = projects[0];
 
+contract("D4ppGovernance", async ([deployer, user1, user2, user3, user4, user5, user6]) => {
+    const _description = web3.utils.toHex("My project proposal");
+    const _startTime = (Number(new Date().getTime().toString()) + 90).toString();
+    const _endTime = (Number(new Date().getTime().toString()) + 3600).toString();
+    const _withdrawalAmount = toWei(20);
 
-contract("D4ppCore", async ([deployer, user1, user2, user3]) => {
+    let receipt;
+
+    const _init = async () => {
+        // user2 approve 10 tokens to D4ppCore
+        await this.token.approve(this.contract.address, toWei(10), { from: user2 });
+        await this.contract.grantFunds("1", toWei(10), { from: user2 });
+
+        // user3 approve 10 tokens to D4ppCore
+        await this.token.approve(this.contract.address, toWei(10), { from: user3 });
+        await this.contract.grantFunds("1", toWei(10), { from: user3 });
+
+        // user4 approve 10 tokens to D4ppCore
+        await this.token.approve(this.contract.address, toWei(10), { from: user4 });
+        await this.contract.grantFunds("1", toWei(10), { from: user4 });
+
+        // user5 approve 10 tokens to D4ppCore
+        await this.token.approve(this.contract.address, toWei(10), { from: user5 });
+        await this.contract.grantFunds("1", toWei(10), { from: user5 });
+    }
+
     beforeEach(async () => {
         this.token = await D4ppToken.new("D4pp Token", "d4pp", { from: deployer });
-        this.contract = await D4ppCore.new(this.token.address, { from: deployer });
-
         this.myToken = await D4ppToken.new("My Token", "MYT", { from: deployer });
 
-        // Transfer 1000 tokens to user1, user2 and user3
-        await this.token.transfer(user1, toWei(1000), { from: deployer });
-        await this.token.transfer(user2, toWei(1000), { from: deployer });
-        await this.token.transfer(user3, toWei(1000), { from: deployer });
+        this.contract = await D4ppGovernance.new(this.token.address, { from: deployer });
 
+        // Transfer 1000 tokens to users
+        await this.token.transfer(user1, toWei(100), { from: deployer });
+        await this.token.transfer(user2, toWei(100), { from: deployer });
+        await this.token.transfer(user3, toWei(100), { from: deployer });
+        await this.token.transfer(user4, toWei(100), { from: deployer });
+        await this.token.transfer(user5, toWei(100), { from: deployer });
+
+
+        await this.contract.registerProject(startTime, endTime, toWei(5000), hardCap, { from: user1 });
+        await _init();
+        receipt = await this.contract.createProposal("1", _description, _startTime, _endTime, _withdrawalAmount, { from: user1 });
     })
-
-    describe("deployment", () => {
-        it("should deploy contract properly", async () => {
-            assert.notEqual(this.contract.address, "");
-            assert.notEqual(this.contract.address, null);
-            assert.notEqual(this.contract.address, undefined);
-        });
-    })
-
-    describe("should register new project", async () => {
-        let receipt;
-
-        beforeEach(async () => {
-            receipt = await this.contract.registerProject(startTime, endTime, softCap, hardCap, { from: user1 });
-        })
-
-        it("should create new project", async () => {
-            const project = await this.contract.projects(1);
+    
+    describe("createProposal", () => {
+        it("should create new proposal", async () => {
             const { 
-                creator,
-                projectId,
-                startTime: _startTime, 
-                endTime: _endTime, 
-                softCap: _softCap, 
-                hardCap: _hardCap,
-            } = project;
+                description, 
+                proposer, 
+                projectId, 
+                startTime, 
+                endTime,
+                forVotes,
+                againstVotes,
+                totalVotes,
+                executed,
+                withdrawalAmount 
+            } = await this.contract.proposals("1");
 
-            expect(creator).to.equal(user1);
+            expect(web3.utils.hexToUtf8(description)).to.equal(web3.utils.hexToUtf8(_description));
+            expect(proposer).to.equal(user1);
             expect(projectId.toString()).to.equal("1");
-            expect(_startTime.toString()).to.equal(startTime);
-            expect(_endTime.toString()).to.equal(endTime);
-            expect(_softCap.toString()).to.equal(softCap);
-            expect(_hardCap.toString()).to.equal(hardCap);
+            expect(startTime.toString()).to.equal(_startTime);
+            expect(endTime.toString()).to.equal(_endTime);
+            expect(forVotes.toString()).to.equal("0");
+            expect(againstVotes.toString()).to.equal("0");
+            expect(totalVotes.toString()).to.equal("0");
+            expect(executed).to.equal(false);
+            expect(withdrawalAmount.toString()).to.equal(_withdrawalAmount);
         })
 
-        it("should reject if startTime < block.timestamp", async () => {
+        it("should reject proposal if msg.sender !== creator", async () => {
             try {
-                await this.contract.registerProject('20', endTime, softCap, hardCap, { from: user2 });
+                await this.contract.createProposal("1", _description, _startTime, _endTime, _withdrawalAmount, { from: user2 });
             } catch (error) {
-                assert(error.message.includes("D4ppCore: startTime and endTime should be greater than or equal to current block"));
+                assert(error.message.includes("D4ppGovernance: Accessed restricted to only valid creator"));
                 return;
             }
             assert(false);
         })
 
-        it("should reject if startTime === endTime", async () => {
+        it("should reject if proposal description is empty", async () => {
             try {
-                await this.contract.registerProject(startTime, startTime, softCap, hardCap, { from: user2 });
+                const _description = web3.utils.toHex("");
+                await this.contract.createProposal("1", _description, _startTime, _endTime, _withdrawalAmount, { from: user1 });
             } catch (error) {
-                assert(error.message.includes("D4ppCore: endTime must be greater than startTime"));
+                assert(error.message.includes("D4ppGovernance: Invalid proposal descriptoion"));
+                return;
+            }
+            assert(false);
+        })
+
+        it("should reject if startTime < block.timestamp", async () => {
+            try {
+                await this.contract.createProposal("1", _description, "0", _endTime, _withdrawalAmount, { from: user1 });
+            } catch (error) {
+                assert(error.message.includes("D4ppGovernance: startTime & endTime must be greater than block.timestamp"));
                 return;
             }
             assert(false);
@@ -91,213 +124,138 @@ contract("D4ppCore", async ([deployer, user1, user2, user3]) => {
 
         it("should reject if endTime < block.timestamp", async () => {
             try {
-                await this.contract.registerProject(startTime, '0', softCap, hardCap, { from: user2 });
+                await this.contract.createProposal("1", _description, _startTime, "0", _withdrawalAmount, { from: user1 });
             } catch (error) {
-                assert(error.message.includes("D4ppCore: startTime and endTime should be greater than or equal to current block"));
+                assert(error.message.includes("D4ppGovernance: startTime & endTime must be greater than block.timestamp"));
                 return;
             }
             assert(false);
         })
 
-        it("should reject if SoftCap <= Zero", async () => {
+        it("should reject if endTime <= startTime", async () => {
             try {
-                await this.contract.registerProject(startTime, endTime, 0, hardCap, { from: user2 });
+                await this.contract.createProposal("1", _description, _startTime, _startTime, _withdrawalAmount, { from: user1 });
             } catch (error) {
-                assert(error.message.includes("D4ppCore: SofCap and HardCap must be greater than zero"));
+                assert(error.message.includes("D4ppGovernance: endTime must be greater than startTime"));
                 return;
             }
             assert(false);
         })
 
-        it("should reject if HardCap <= Zero", async () => {
+        it("should emit ProposalCreated event", async () => {
+            expectEvent(receipt, "ProposalCreated", {
+                proposer: user1,
+                projectId: "1",
+                startTime: _startTime,
+                endTime: _endTime
+            })
+        })
+    })
+
+    describe("vote", () => {
+        it("should accept incoming valid votes", async () => {
+            await this.contract.vote("1", true, { from: user2 });
+            const { totalVotes, forVotes, againstVotes } = await this.contract.proposals("1");
+            expect(totalVotes.toString()).to.equal("1");
+            expect(forVotes.toString()).to.equal("1");
+            expect(againstVotes.toString()).to.equal("0");
+        })
+
+        it("should update voting reciept for voters", async () => {
+            await this.contract.vote("1", true, { from: user2 });
+            const { projectId, hasVoted } = await this.contract.receipts("1", user2);
+
+            expect(projectId.toString()).to.equal("1");
+            expect(hasVoted).to.equal(true);
+        })
+
+        it("should reject vote with invalid project id", async () => {
             try {
-                await this.contract.registerProject(startTime, endTime, softCap, 0, { from: user2 });
+                await this.contract.vote("2", true, { from: user2 });
             } catch (error) {
-                assert(error.message.includes("D4ppCore: SofCap and HardCap must be greater than zero"));
+                assert(error.message.includes("D4ppGovernance: projectId does not exist"));
                 return;
             }
             assert(false);
         })
 
-        it("should reject if SoftCap === HardCap", async () => {
+        it("should reject invalid vote", async () => {
             try {
-                await this.contract.registerProject(startTime, endTime, "20", "20", { from: user2 });
+                await this.contract.vote("1", true, { from: user6 });
             } catch (error) {
-                assert(error.message.includes("D4ppCore: SoftCap must not equal HardCap"));
+                assert(error.message.includes("D4ppGovernance: Not allowed to partipicate in this voting process"));
                 return;
             }
             assert(false);
         })
 
-        it("should emit ProjectCreated event", async () => {
-            expectEvent(receipt, "ProjectCreated", {
-                creator: user1,
+        it("should emit Voted event", async () => {
+            const receipt =  await this.contract.vote("1", true, { from: user2 });
+            expectEvent(receipt, "Voted", {
+                projectId: "1",
+                voter: user2,
+                votes: "1"
+            })
+        })
+
+        it("should reject duplicate vote", async () => {
+            try {
+                await this.contract.vote("1", true, { from: user2 });
+                await this.contract.vote("1", true, { from: user2 });
+            } catch (error) {
+                assert(error.message.includes("D4ppGovernance: duplicate votes found!"));
+                return;
+            }
+            assert(false);
+        })
+        
+        it("should increment total votes count properly", async () => {
+            await this.contract.vote("1", true, { from: user2 });
+            await this.contract.vote("1", false, { from: user3 });
+            await this.contract.vote("1", true, { from: user4 });
+            await this.contract.vote("1", false, { from: user5 });
+
+            const { totalVotes } = await this.contract.proposals("1");
+            expect(totalVotes.toString()).to.equal("4");
+        })
+    })
+
+    describe("execute", () => {
+        beforeEach(async () => {
+            await this.contract.vote("1", true, { from: user2 });
+            await this.contract.vote("1", false, { from: user3 });
+            await this.contract.vote("1", true, { from: user4 });
+            await this.contract.vote("1", true, { from: user5 });
+        })
+
+        it("should execute proposal after voting as been completed", async () => {
+            await this.contract.execute("1", { from: user1 });
+            const result = await this.contract.unlockFunds("1");
+            expect(result).to.equal(true);
+        })
+
+        it("should not execute proposal twice", async () => {
+            try {
+                await this.contract.execute("1", { from: user1 });
+                await this.contract.execute("1", { from: user1 });
+            } catch (error) {
+                assert(error.message.includes("D4ppGovernance: Proposal has already been executed"));
+                return;
+            }
+            assert(false);
+        })
+
+        it("should emit ProposalExecuted event", async () => {
+            const receipt = await this.contract.execute("1", { from: user1 });
+            expectEvent(receipt, "ProposalExecuted", {
                 projectId: "1"
             })
         })
     })
 
-    describe("should fundProject project", () => {
-        let receipt;
-
-        beforeEach(async () => {
-            await this.contract.registerProject(startTime, endTime, softCap, hardCap, { from: user1 });
-            
-            // approve 100 tokens to D4ppCore
-            await this.token.approve(this.contract.address, toWei(100), { from: user2 });
-            receipt = await this.contract.grantFunds("1", toWei(100), { from: user2 });
-        })
-
-        it("should grant funds to registered projects", async () => {
-            const { currentRaised } = await this.contract.projects("1");
-            const amount = await this.contract.grants("1", user2);
-            expect(currentRaised.toString()).to.equal(toWei(100));
-            expect(amount.toString()).to.equal(toWei(100));
-        })
-
-        it("should not grant funds to unregistered projects", async () => {
-            try {
-                await this.token.approve(this.contract.address, toWei(100), { from: user3 });
-                await this.contract.grantFunds("100", toWei(100), { from: user3 });
-            } catch (error) {
-                assert(error.message.includes("D4ppCore: ProjectId doesn't exist"));
-                return;
-            }
-            assert(false);
-        })
-
-        // it("should not grant funds if endTime has been exceeded", async () => {
-        //     try {
-        //         const _endTime = (Number(startTime) + 1).toString();
-        //         await this.contract.registerProject(startTime, _endTime, softCap, hardCap, { from: user1 });
-        //         await wait();
-        //         await this.token.approve(this.contract.address, toWei(100), { from: user2 });
-        //         await this.contract.grantFunds("2", toWei(100), { from: user2 });
-        //     } catch (error) {
-        //         console.log(error.message)
-        //         assert(error.message.includes("D4ppCore: EndTime has been exceeded"));
-        //         return;
-        //     }
-        //     assert(false);
-        // })
-
-        it("should increment grants properly", async () => {
-            await this.token.approve(this.contract.address, toWei(10), { from: user2 });
-            await this.contract.grantFunds("1", toWei(10), { from: user2 });
-
-            const { currentRaised } = await this.contract.projects("1");
-            const amount = await this.contract.grants("1", user2);
-
-            expect(currentRaised.toString()).to.equal(toWei(110));
-            expect(amount.toString()).to.equal(toWei(110));
-        })
-
-        it("should reject grants if project have been fully funded", async () => {
-            try {
-                await this.token.approve(this.contract.address, toWei(100), { from: user3 });
-                await this.contract.grantFunds("1", toWei(100), { from: user3 });
-            } catch (error) {
-                assert(error.message.includes("D4ppCore: Project has been fully funded"));
-                return;
-            }
-            assert(false);
-        })
-
-        it("should emit GrantFunds event", async () => {
-            expectEvent(receipt, "GrantFunds", {
-                user: user2,
-                projectId: "1",
-                amount: toWei(100)
-            })
-        })
-    })
-
-    describe("rewardsPool", () => {
-        it("should return rewards in the pool", async () => {
-            const { token, projectId, amount } = await this.contract.rewardsPool("0");
-            expect(token).to.equal(ZERO_ADDRESS);
-            expect(projectId.toString()).to.equal("0");
-            expect(amount.toString()).to.equal("0");
-        })
-    })
-    
-    describe("seedTokensToProject", () => {
-        beforeEach(async () => {
-            await this.contract.registerProject(startTime, endTime, softCap, hardCap, { from: user1 });
-            // user2 grant some tokens to project 1
-            await this.token.approve(this.contract.address, toWei(10), { from: user2 });
-            await this.contract.grantFunds("1", toWei(10), { from: user2 });
-
-            // Project 1 creator seeds some rewards to the reward pool
-            await this.myToken.transfer(user1, toWei(100), { from: deployer });
-            await this.myToken.approve(this.contract.address, toWei(30), { from: user1 });
-            await this.contract.seedTokensToProject("1", this.myToken.address, toWei(30), { from: user1 });
-        })
-
-        it("should seed tokens to the rewardPool", async () => {
-            const balance = await this.myToken.balanceOf(this.contract.address);
-            const userBalance = await this.myToken.balanceOf(user1);
-
-            const { token, projectId, amount } = await this.contract.rewardsPool("1");
-            expect(token).to.equal(this.myToken.address);
-            expect(projectId.toString()).to.equal("1");
-            expect(amount.toString()).to.equal(toWei(30));
-
-            expect(balance.toString()).to.equal(toWei(30));
-            expect(userBalance.toString()).to.equal(toWei(70));
-        })
-
-        it("should not seed tokens to pool if caller is not the creator", async () => {
-            try {
-                await this.myToken.transfer(user2, toWei(50), { from: deployer });
-                await this.myToken.approve(this.contract.address, toWei(30), { from: user2 });
-                await this.contract.seedTokensToProject("1", this.myToken.address, toWei(30), { from: user2 });
-            } catch (error) {
-                assert(error.message.includes("D4ppCore: Only valid creator can seed tokens"));
-                return;
-            }
-            assert(false);
-        })
-    })
-    
-    describe("withdrawRewards", () => {
-        beforeEach(async () => {
-            await this.contract.registerProject(startTime, endTime, softCap, hardCap, { from: user1 });
-            
-            await this.myToken.transfer(user1, toWei(100), { from: deployer });
-            
-            // Project 1 creator seeds some rewards to the reward pool
-            await this.myToken.approve(this.contract.address, toWei(30), { from: user1 });
-            await this.contract.seedTokensToProject("1", this.myToken.address, toWei(30), { from: user1 });
-
-            // user2 grant some tokens to project 1
-            await this.token.approve(this.contract.address, toWei(10), { from: user2 });
-            await this.contract.grantFunds("1", toWei(10), { from: user2 });
-
-            // user3 grant some tokens to project 1
-            await this.token.approve(this.contract.address, toWei(5), { from: user3 });
-            await this.contract.grantFunds("1", toWei(5), { from: user3 });
-
-            // withdraw rewards
-            await this.contract.withdrawRewards("1", { from: user2 });
-            await this.contract.withdrawRewards("1", { from: user3 });
-        })
-
-        it("should withdraw rewards from project", async () => {
-            const isPaid = await this.contract.rewardsPaid(user2);
-            expect(isPaid).to.equal(true);
-
-        })
-
-        it("should increase user's balance and decrese contract balance", async () => {
-            const balance = await this.myToken.balanceOf(this.contract.address);
-            const userBalance = await this.myToken.balanceOf(user3);
-
-            console.log(balance.toString())
-            // expect(balance.toString()).to.equal(toWei(30));
-            // expect(userBalance.toString()).to.equal(toWei(70));
-        })
-    })
+    // describe("should overwrite existing proposal after it has been executed", () => {
+        
+    // })
     
     
 })
