@@ -187,5 +187,10 @@ contract D4ppGovernance is D4ppCore {
             unlockFunds[_projectId] > 0,
             ""
         );
+        uint _amount = unlockFunds[_projectId];
+
+        proposals[_projectId].currentRaised = proposals[_projectId].currentRaised.sub(_amount);
+        unlockFunds[_projectId] = 0;
+        IERC20(token).transfer(_msgSender(), _amount);
     }
 }
