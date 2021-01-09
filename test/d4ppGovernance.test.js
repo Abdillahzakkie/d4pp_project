@@ -19,7 +19,7 @@ const projects = [
 
 const { startTime, endTime, softCap, hardCap } = projects[0];
 
-contract("D4ppGovernance", async ([deployer, user1, user2, user3, user4, user5, user6]) => {
+contract("D4ppGovernance", async ([deployer, devAddress, user1, user2, user3, user4, user5, user6]) => {
     const _description = web3.utils.toHex("My project proposal");
     const _startTime = (Number(new Date().getTime().toString()) + 90).toString();
     const _endTime = (Number(new Date().getTime().toString()) + 3600).toString();
@@ -49,7 +49,7 @@ contract("D4ppGovernance", async ([deployer, user1, user2, user3, user4, user5, 
         this.token = await D4ppToken.new("D4pp Token", "d4pp", { from: deployer });
         this.myToken = await D4ppToken.new("My Token", "MYT", { from: deployer });
 
-        this.contract = await D4ppGovernance.new(this.token.address, { from: deployer });
+        this.contract = await D4ppGovernance.new(this.token.address, devAddress, { from: deployer });
 
         // Transfer 1000 tokens to users
         await this.token.transfer(user1, toWei(100), { from: deployer });
@@ -137,6 +137,16 @@ contract("D4ppGovernance", async ([deployer, user1, user2, user3, user4, user5, 
                 await this.contract.createProposal("1", _description, _startTime, _startTime, _withdrawalAmount, { from: user1 });
             } catch (error) {
                 assert(error.message.includes("D4ppGovernance: endTime must be greater than startTime"));
+                return;
+            }
+            assert(false);
+        })
+
+        it("should reject if withdrawAmount is greater than current raised", async () => {
+            try {
+                await this.contract.createProposal("1", _description, _startTime, _endTime, toWei(100), { from: user1 });
+            } catch (error) {
+                assert(error.message.includes("D4ppCore: _withdrawalAmount exceed currentRaised"));
                 return;
             }
             assert(false);
@@ -257,9 +267,28 @@ contract("D4ppGovernance", async ([deployer, user1, user2, user3, user4, user5, 
         })
     })
 
-    // describe("should overwrite existing proposal after it has been executed", () => {
-        
-    // })
-    
-    
+    describe("withdrawCrowdsaleTokens", () => {
+        beforeEach(async () => {
+            await this.contract.vote("1", true, { from: user2 });
+            await this.contract.vote("1", false, { from: user3 });
+            await this.contract.vote("1", true, { from: user4 });
+        })
+
+        it("should update project creator balance properly", async () => {
+            await this.contract.execute("1", { from: user1 });
+            await this.contract.withdrawCrowdsaleTokens("1", { from: user1 });
+            const _creatorBalanceAfterWithdrawal = await this.token.balanceOf(user1);
+            expect(_creatorBalanceAfterWithdrawal.toString()).to.equal(toWei(118));
+        })
+
+        it("should reject if proposal has not been executed", async () => {
+            try {
+                await this.contract.withdrawCrowdsaleTokens("1", { from: user1 });
+            } catch (error) {
+                assert(error.message.includes("D4ppGovernance: Proposal has not been executed yet"));
+                return;
+            }
+            assert(false);
+        })
+    })
 })

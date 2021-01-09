@@ -21,12 +21,12 @@ const projects = [
 const { startTime, endTime, softCap, hardCap } = projects[0];
 
 
-contract("D4PPCORE", async ([deployer, user1, user2, user3]) => {
+contract("D4PPCORE", async ([deployer, devAddress, user1, user2, user3]) => {
     beforeEach(async () => {
         this.token = await D4ppToken.new("D4pp Token", "d4pp", { from: deployer });
         this.myToken = await D4ppToken.new("My Token", "MYT", { from: deployer });
 
-        this.contract = await D4ppGovernance.new(this.token.address, { from: deployer });
+        this.contract = await D4ppGovernance.new(this.token.address, devAddress, { from: deployer });
 
         // Transfer 100 tokens to users
         await this.token.transfer(user1, toWei(100), { from: deployer });
@@ -36,9 +36,11 @@ contract("D4PPCORE", async ([deployer, user1, user2, user3]) => {
 
     describe("deployment", () => {
         it("should deploy contract properly", async () => {
+            const _devAddress = await this.contract.devAddress();
             assert.notEqual(this.contract.address, "");
             assert.notEqual(this.contract.address, null);
             assert.notEqual(this.contract.address, undefined);
+            expect(devAddress).to.equal(devAddress);
         });
     })
 
