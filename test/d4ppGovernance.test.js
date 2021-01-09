@@ -162,110 +162,110 @@ contract("D4ppGovernance", async ([deployer, devAddress, user1, user2, user3, us
         })
     })
 
-    // describe("vote", () => {
-    //     it("should accept incoming valid votes", async () => {
-    //         await this.contract.vote("1", true, { from: user2 });
-    //         const { totalVotes, forVotes, againstVotes } = await this.contract.proposals("1");
-    //         expect(totalVotes.toString()).to.equal("1");
-    //         expect(forVotes.toString()).to.equal("1");
-    //         expect(againstVotes.toString()).to.equal("0");
-    //     })
+    describe("vote", () => {
+        it("should accept incoming valid votes", async () => {
+            await this.contract.vote("1", true, { from: user2 });
+            const { totalVotes, forVotes, againstVotes } = await this.contract.proposals("1");
+            expect(totalVotes.toString()).to.equal("1");
+            expect(forVotes.toString()).to.equal("1");
+            expect(againstVotes.toString()).to.equal("0");
+        })
 
-    //     it("should update voting reciept for voters", async () => {
-    //         await this.contract.vote("1", true, { from: user2 });
-    //         const { projectId, hasVoted } = await this.contract.receipts("1", user2);
+        it("should update voting reciept for voters", async () => {
+            await this.contract.vote("1", true, { from: user2 });
+            const { projectId, hasVoted } = await this.contract.receipts("1", user2);
 
-    //         expect(projectId.toString()).to.equal("1");
-    //         expect(hasVoted).to.equal(true);
-    //     })
+            expect(projectId.toString()).to.equal("1");
+            expect(hasVoted).to.equal(true);
+        })
 
-    //     it("should reject vote with invalid project id", async () => {
-    //         try {
-    //             await this.contract.vote("2", true, { from: user2 });
-    //         } catch (error) {
-    //             assert(error.message.includes("D4ppGovernance: projectId does not exist"));
-    //             return;
-    //         }
-    //         assert(false);
-    //     })
+        it("should reject vote with invalid project id", async () => {
+            try {
+                await this.contract.vote("2", true, { from: user2 });
+            } catch (error) {
+                assert(error.message.includes("D4ppGovernance: projectId does not exist"));
+                return;
+            }
+            assert(false);
+        })
 
-    //     it("should reject invalid vote", async () => {
-    //         try {
-    //             await this.contract.vote("1", true, { from: user6 });
-    //         } catch (error) {
-    //             assert(error.message.includes("D4ppGovernance: Not allowed to partipicate in this voting process"));
-    //             return;
-    //         }
-    //         assert(false);
-    //     })
+        it("should reject invalid vote", async () => {
+            try {
+                await this.contract.vote("1", true, { from: user6 });
+            } catch (error) {
+                assert(error.message.includes("D4ppGovernance: Not allowed to partipicate in this voting process"));
+                return;
+            }
+            assert(false);
+        })
 
-    //     it("should emit Voted event", async () => {
-    //         const receipt =  await this.contract.vote("1", true, { from: user2 });
-    //         expectEvent(receipt, "Voted", {
-    //             projectId: "1",
-    //             voter: user2,
-    //             votes: "1"
-    //         })
-    //     })
+        it("should emit Voted event", async () => {
+            const receipt =  await this.contract.vote("1", true, { from: user2 });
+            expectEvent(receipt, "Voted", {
+                projectId: "1",
+                voter: user2,
+                votes: "1"
+            })
+        })
 
-    //     it("should reject duplicate vote", async () => {
-    //         try {
-    //             await this.contract.vote("1", true, { from: user2 });
-    //             await this.contract.vote("1", true, { from: user2 });
-    //         } catch (error) {
-    //             assert(error.message.includes("D4ppGovernance: duplicate votes found!"));
-    //             return;
-    //         }
-    //         assert(false);
-    //     })
+        it("should reject duplicate vote", async () => {
+            try {
+                await this.contract.vote("1", true, { from: user2 });
+                await this.contract.vote("1", true, { from: user2 });
+            } catch (error) {
+                assert(error.message.includes("D4ppGovernance: duplicate votes found!"));
+                return;
+            }
+            assert(false);
+        })
         
-    //     it("should increment total votes count properly", async () => {
-    //         await this.contract.vote("1", true, { from: user2 });
-    //         await this.contract.vote("1", false, { from: user3 });
-    //         await this.contract.vote("1", true, { from: user4 });
-    //         await this.contract.vote("1", false, { from: user5 });
+        it("should increment total votes count properly", async () => {
+            await this.contract.vote("1", true, { from: user2 });
+            await this.contract.vote("1", false, { from: user3 });
+            await this.contract.vote("1", true, { from: user4 });
+            await this.contract.vote("1", false, { from: user5 });
 
-    //         const { totalVotes } = await this.contract.proposals("1");
-    //         expect(totalVotes.toString()).to.equal("4");
-    //     })
-    // })
+            const { totalVotes } = await this.contract.proposals("1");
+            expect(totalVotes.toString()).to.equal("4");
+        })
+    })
 
-    // describe("execute", () => {
-    //     beforeEach(async () => {
-    //         await this.contract.vote("1", true, { from: user2 });
-    //         await this.contract.vote("1", false, { from: user3 });
-    //         await this.contract.vote("1", true, { from: user4 });
-    //         await this.contract.vote("1", true, { from: user5 });
-    //     })
+    describe("execute", () => {
+        beforeEach(async () => {
+            await this.contract.vote("1", true, { from: user2 });
+            await this.contract.vote("1", false, { from: user3 });
+            await this.contract.vote("1", true, { from: user4 });
+            await this.contract.vote("1", true, { from: user5 });
+        })
 
-    //     it("should execute proposal after voting as been completed", async () => {
-    //         await this.contract.execute("1", { from: user1 });
+        it("should execute proposal after voting as been completed", async () => {
+            await this.contract.execute("1", { from: user1 });
 
-    //         const { executed } = await this.contract.proposals("1");
-    //         const result = await this.contract.unlockFunds("1");
+            const { executed } = await this.contract.proposals("1");
+            const result = await this.contract.unlockFunds("1");
             
-    //         expect(result.toString()).to.equal(_withdrawalAmount);
-    //         expect(executed).to.equal(true);
-    //     })
+            expect(result.toString()).to.equal(_withdrawalAmount);
+            expect(executed).to.equal(true);
+        })
 
-    //     it("should not execute proposal twice", async () => {
-    //         try {
-    //             await this.contract.execute("1", { from: user1 });
-    //             await this.contract.execute("1", { from: user1 });
-    //         } catch (error) {
-    //             assert(error.message.includes("D4ppGovernance: Proposal has already been executed"));
-    //             return;
-    //         }
-    //         assert(false);
-    //     })
+        it("should not execute proposal twice", async () => {
+            try {
+                await this.contract.execute("1", { from: user1 });
+                await this.contract.execute("1", { from: user1 });
+            } catch (error) {
+                assert(error.message.includes("D4ppGovernance: Proposal has already been executed"));
+                return;
+            }
+            assert(false);
+        })
 
-    //     it("should emit ProposalExecuted event", async () => {
-    //         const receipt = await this.contract.execute("1", { from: user1 });
-    //         expectEvent(receipt, "ProposalExecuted", {
-    //             projectId: "1"
-    //         })
-    //     })
-    // })
+        it("should emit ProposalExecuted event", async () => {
+            const receipt = await this.contract.execute("1", { from: user1 });
+            expectEvent(receipt, "ProposalExecuted", {
+                projectId: "1"
+            })
+        })
+    })
 
     describe("withdrawCrowdsaleTokens", () => {
         beforeEach(async () => {
