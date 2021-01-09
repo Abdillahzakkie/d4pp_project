@@ -46,7 +46,7 @@ contract D4ppGovernance is D4ppCore {
     mapping(uint => mapping(address => Receipt)) public receipts;
 
     /// @notice Unlocks funds after a proposal have beeen executed
-    mapping(uint => bool) public unlockFunds;
+    mapping(uint => uint) public unlockFunds;
 
     /// @notice An event emitted when a new proposal is created
     event ProposalCreated(
@@ -171,9 +171,10 @@ contract D4ppGovernance is D4ppCore {
 
         uint _forVotes = proposals[_projectId].forVotes;
         uint _againstVotes = proposals[_projectId].againstVotes;
+        uint _withdrawalAmount = proposals[_projectId].withdrawalAmount;
 
-        if(_forVotes > _againstVotes) unlockFunds[_projectId] = true;
-        else unlockFunds[_projectId] = false;
+        if(_forVotes > _againstVotes) unlockFunds[_projectId] = _withdrawalAmount;
+        else unlockFunds[_projectId] = 0;
         emit ProposalExecuted(_projectId);
     }
     
@@ -183,7 +184,7 @@ contract D4ppGovernance is D4ppCore {
             "D4ppGovernance: Proposal has not been executed yet"
         );
         require(
-            unlockFunds[_projectId],
+            unlockFunds[_projectId] > 0,
             ""
         );
     }

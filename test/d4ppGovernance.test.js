@@ -231,7 +231,7 @@ contract("D4ppGovernance", async ([deployer, user1, user2, user3, user4, user5, 
         it("should execute proposal after voting as been completed", async () => {
             await this.contract.execute("1", { from: user1 });
             const result = await this.contract.unlockFunds("1");
-            expect(result).to.equal(true);
+            expect(result).to.equal(_withdrawalAmount.toString());
         })
 
         it("should not execute proposal twice", async () => {
