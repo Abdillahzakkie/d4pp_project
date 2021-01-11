@@ -45,6 +45,11 @@ contract("D4ppGovernance", async ([deployer, devAddress, user1, user2, user3, us
         await this.contract.grantFunds("1", toWei(10), { from: user5 });
     }
 
+    const _increaseGrants = async (_amount, user) => {
+        await this.token.approve(this.contract.address, _amount, { from: user });
+        await this.contract.grantFunds("1", _amount, { from: user });
+    }
+
     beforeEach(async () => {
         this.token = await D4ppToken.new("D4pp Token", "d4pp", { from: deployer });
         this.myToken = await D4ppToken.new("My Token", "MYT", { from: deployer });
@@ -59,8 +64,9 @@ contract("D4ppGovernance", async ([deployer, devAddress, user1, user2, user3, us
         await this.token.transfer(user5, toWei(100), { from: deployer });
 
 
-        await this.contract.registerProject(startTime, endTime, toWei(5000), hardCap, { from: user1 });
+        await this.contract.registerProject(startTime, endTime, softCap, hardCap, { from: user1 });
         await _init();
+        await _increaseGrants(toWei(40), user3);
         receipt = await this.contract.createProposal("1", _description, _startTime, _endTime, _withdrawalAmount, { from: user1 });
     })
     

@@ -26,6 +26,18 @@ contract D4ppCore is Ownable, ReentrancyGuard {
     /// @notice An event emitted when grants has been withdrawed
     event GrantsWithdrawed(address indexed user, uint projectId, uint amount);
 
+    /// @notice Stores a record of all the registered projects
+    mapping(uint => Project) public projects;
+
+    /// @notice Stores a record of all the grants made
+    mapping(uint => mapping(address => uint)) public grants;
+
+    /// @notice Keeps track of tokens seeded to the rewardPool 
+    mapping(uint => Rewards) public rewardsPool;
+
+    /// @notice Keeps tracks of the paid rewards
+    mapping(uint => mapping(address => bool)) public rewardsPaid;
+
     struct Project{
         address creator;
         uint projectId;
@@ -40,18 +52,6 @@ contract D4ppCore is Ownable, ReentrancyGuard {
         uint projectId;
         uint amount;
     }
-
-    /// @notice Stores a record of all the registered projects
-    mapping(uint => Project) public projects;
-
-    /// @notice Stores a record of all the grants made
-    mapping(uint => mapping(address => uint)) public grants;
-
-    /// @notice Keeps track of tokens seeded to the rewardPool 
-    mapping(uint => Rewards) public rewardsPool;
-
-    /// @notice Keeps tracks of the paid rewards
-    mapping(uint => mapping(address => bool)) public rewardsPaid;
 
     /// @dev Register new project
     /// @param _startTime: Timestamp of when the crowdfund will start
@@ -69,6 +69,7 @@ contract D4ppCore is Ownable, ReentrancyGuard {
         );
         require(_softCap > 0 && _hardCap > 0, "D4ppCore: SofCap and HardCap must be greater than zero");
         require(_softCap != _hardCap, "D4ppCore: SoftCap must not equal HardCap");
+        require(_softCap < _hardCap, "D4ppCore: softcap must be below the hardcap");
 
         projectCount = projectCount.add(1);
         projects[projectCount] = Project(
@@ -123,15 +124,18 @@ contract D4ppCore is Ownable, ReentrancyGuard {
             grants[_projectId][_msgSender()] > 0,
             "D4ppCore: Not eligible to rewards from this project"
         );
+        require(
+            projects[_projectId].currentRaised > projects[_projectId].softCap,
+            "D4ppCore: CurrentRaised is less than the Softcap"
+        );
 
         address _token = rewardsPool[_projectId].token;
         uint _totalRewards = rewardsPool[_projectId].amount;
         uint _grants = grants[_projectId][_msgSender()];
         uint _currentRaised = projects[_projectId].currentRaised;
 
-
-        uint _rewards = _grants.div(_currentRaised);
-        _rewards = _rewards.mul(_totalRewards);
+        uint _rewards = _grants.mul(_totalRewards);
+        _rewards = _rewards.div(_currentRaised);
         
         rewardsPaid[_projectId][_msgSender()] = true;
         rewardsPool[_projectId].amount = rewardsPool[_projectId].amount.sub(_rewards);
@@ -144,6 +148,10 @@ contract D4ppCore is Ownable, ReentrancyGuard {
             "D4ppCore: Not eligible to rewards from this project"
         );
         require(
+            projects[_projectId].currentRaised < projects[_projectId].softCap,
+            "D4ppCore: Sofcap have already been reached"
+        );
+        require(
             !rewardsPaid[_projectId][_msgSender()],
             "D4ppCore: Not eligible to any withdrawal from this project"
         );
@@ -152,10 +160,5 @@ contract D4ppCore is Ownable, ReentrancyGuard {
         projects[_projectId].currentRaised = projects[_projectId].currentRaised.sub(_amount);
         IERC20(token).transfer(_msgSender(), _amount);
         emit GrantsWithdrawed(_msgSender(), _projectId, _amount);
-    }
-
-    function withdarAnyERC20Tokens(address _tokenAddress) external onlyOwner {
-        uint _balance = IERC20(_tokenAddress).balanceOf(address(this));
-        IERC20(_tokenAddress).transfer(_msgSender(), _balance);
     }
 }

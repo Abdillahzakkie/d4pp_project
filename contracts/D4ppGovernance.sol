@@ -125,6 +125,10 @@ contract D4ppGovernance is D4ppCore {
             _withdrawalAmount <= projects[_projectId].currentRaised,
             "D4ppCore: _withdrawalAmount exceed currentRaised"
         );
+        require(
+            projects[_projectId].currentRaised >= projects[_projectId].softCap,
+            "D4ppGovernance: can not create new proposal while softcap is less than the currentRaised"
+        );
         _propose(_proposeDescription, _projectId, _startTime, _endTime, _withdrawalAmount);
     }
 
@@ -181,7 +185,7 @@ contract D4ppGovernance is D4ppCore {
         emit ProposalExecuted(_projectId);
     }
     
-    function withdrawCrowdsaleTokens(uint _projectId) public onlyValidCreator(_projectId) {
+    function withdrawCrowdFundTokens(uint _projectId) public onlyValidCreator(_projectId) {
         require(
             proposals[_projectId].executed,
             "D4ppGovernance: Proposal has not been executed yet"
